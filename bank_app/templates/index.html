@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OmniCore Back-Office Banking Console v4.2</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+    <!-- Top Bar with Tenant Identifier -->
+    <div class="top-bar">
+        <div class="brand-badge">OmniCore Back-Office Enterprise Console v4.2</div>
+        <div class="tenant-badge" id="tenant-label">Institution: {{ tenant_name }} ({{ tenant_id }})</div>
+    </div>
+
+    <!-- Compliance / Interstitial Modal (Simulates transient popups requiring recovery) -->
+    {% if show_interstitial %}
+    <div class="modal-overlay" id="compliance-modal">
+        <div class="modal-box">
+            <h3 style="margin-top:0; color:#0b3c61;">Daily Security & Policy Notice</h3>
+            <p>You are accessing a regulated financial system. All interactions are audited and subject to supervisory compliance review.</p>
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn btn-primary" id="btn-acknowledge-notice" onclick="document.getElementById('compliance-modal').classList.add('hidden')">
+                    Acknowledge & Continue
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="container">
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs" role="tablist">
+            <button class="tab-btn active" id="tab-member-lookup" role="tab" onclick="switchTab('lookup')">Member Inquiry & Ledger</button>
+            <button class="tab-btn" id="tab-account-open" role="tab" onclick="switchTab('open-account')">Open Sub-Account</button>
+            <button class="tab-btn" id="tab-security-panel" role="tab" onclick="switchTab('security')">Security Lockout Overrides</button>
+        </div>
+
+        <!-- ================= TAB 1: MEMBER LOOKUP & BALANCE ================= -->
+        <div id="section-lookup" class="tab-content">
+            <div class="card">
+                <h2 class="card-title">Member Profile & Balance Inquiry</h2>
+                <form id="member-search-form" onsubmit="event.preventDefault(); searchMember();">
+                    <div class="form-group">
+                        <label class="form-label" for="member-id-input">Enter Member ID (e.g. MBR-1092, MBR-3041, MBR-LOCKED):</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" class="form-control" id="member-id-input" name="memberQuery" placeholder="e.g. MBR-1092" required>
+                            <button type="submit" class="btn btn-primary" id="btn-search-member" aria-label="Search Member Records">
+                                Search Records
+                            </button>
+                        </div>
+                    </div>
+                </form>
+
+                <!-- Loading Spinner -->
+                <div id="search-spinner" class="spinner hidden"></div>
+
+                <!-- Status / Error Messages (Business Outcome) -->
+                <div id="search-status-alert" class="hidden"></div>
+
+                <!-- Member Record Result Area (Legacy Nested Tables) -->
+                <div id="member-profile-card" class="hidden" style="margin-top:20px;">
+                    <div style="background:#f8fafc; padding:16px; border-radius:6px; border:1px solid #cbd5e1; margin-bottom:16px;">
+                        <h3 style="margin:0 0 10px 0; color:#0b3c61;" id="member-name-heading">Member Details</h3>
+                        <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:12px; font-size:0.95rem;">
+                            <div><strong>Member ID:</strong> <span id="display-member-id"></span></div>
+                            <div><strong>Status:</strong> <span id="display-member-status" style="font-weight:bold;"></span></div>
+                            <div><strong>Masked SSN:</strong> <span id="display-member-ssn"></span></div>
+                        </div>
+                    </div>
+
+                    <h4 style="margin: 16px 0 8px 0; color:#0b3c61;">Deposit Accounts & Balances</h4>
+                    <table class="legacy-table" id="account-ledger-table">
+                        <thead>
+                            <tr>
+                                <th>Account Number</th>
+                                <th>Product Type</th>
+                                <th>Current Balance</th>
+                                <th>Available Balance</th>
+                                <th>Account Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledger-table-body">
+                            <!-- Populated via JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Security Escalation Trigger Area -->
+                <div id="security-challenge-box" class="card alert-danger hidden" style="margin-top:20px;">
+                    <h3 style="margin-top:0; color:#991b1b;">⚠️ Supervisory Security Lockout Detected</h3>
+                    <p>Member account is in <strong>SECURITY_HOLD</strong>. Automated policy prevents reading or modifying ledger records.</p>
+                    <p><strong>Human Operator Intervention Required</strong>: Provide supervisory bypass token to unlock the live session.</p>
+                    <div style="display:flex; gap:10px; margin-top:12px;">
+                        <input type="password" id="supervisor-token-input" class="form-control" placeholder="Enter Operator Security Token (PIN: 9876)">
+                        <button class="btn btn-danger" id="btn-unlock-supervisory" onclick="unlockSupervisoryHold()">Unlock & Resume</button>
+                    </div>
+                    <div id="unlock-msg" style="margin-top:8px; font-weight:bold;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 2: OPEN SUB-ACCOUNT ================= -->
+        <div id="section-open-account" class="tab-content hidden">
+            <div class="card">
+                <h2 class="card-title">Open New Sub-Account for Member</h2>
+                <form id="open-account-form" onsubmit="event.preventDefault(); openSubAccount();">
+                    <div class="form-group">
+                        <label class="form-label" for="open-member-id">Target Member ID:</label>
+                        <input type="text" class="form-control" id="open-member-id" placeholder="e.g. MBR-1092" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="account-product-type">Select Deposit Product:</label>
+                        <select class="form-control" id="account-product-type" required>
+                            <option value="">-- Choose Product --</option>
+                            <option value="High-Yield Savings">High-Yield Savings (4.25% APY)</option>
+                            <option value="Money Market Special">Money Market Special</option>
+                            <option value="Certificate of Deposit (12mo)">Certificate of Deposit (12mo)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="initial-deposit-amount">Initial Opening Deposit ($ USD):</label>
+                        <input type="number" class="form-control" id="initial-deposit-amount" min="50" step="10" placeholder="e.g. 500" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="btn-submit-open-account">
+                        Create Sub-Account & Issue Ledger Record
+                    </button>
+                </form>
+
+                <div id="account-creation-result" class="hidden alert alert-success" style="margin-top:16px;">
+                    <h4>Sub-Account Successfully Created!</h4>
+                    <p>New Account Number: <strong id="created-account-number"></strong></p>
+                    <p>Product: <span id="created-account-type"></span></p>
+                    <p>Opening Balance: <span id="created-account-balance"></span></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 3: SECURITY & AUDIT ================= -->
+        <div id="section-security" class="tab-content hidden">
+            <div class="card">
+                <h2 class="card-title">System Security & Operator Console</h2>
+                <p>Status: All back-office operator activities are streamed to the telemetry bus.</p>
+                <div class="alert alert-warning">
+                    <strong>Tenant Isolation Active:</strong> Configured for <em>{{ tenant_name }}</em>.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script logic for mock backend interactions -->
+    <script>
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+            if (tab === 'lookup') {
+                document.getElementById('tab-member-lookup').classList.add('active');
+                document.getElementById('section-lookup').classList.remove('hidden');
+            } else if (tab === 'open-account') {
+                document.getElementById('tab-account-open').classList.add('active');
+                document.getElementById('section-open-account').classList.remove('hidden');
+            } else if (tab === 'security') {
+                document.getElementById('tab-security-panel').classList.add('active');
+                document.getElementById('section-security').classList.remove('hidden');
+            }
+        }
+
+        async function searchMember() {
+            const memberId = document.getElementById('member-id-input').value.trim();
+            const alertBox = document.getElementById('search-status-alert');
+            const profileCard = document.getElementById('member-profile-card');
+            const lockBox = document.getElementById('security-challenge-box');
+            const spinner = document.getElementById('search-spinner');
+
+            alertBox.className = 'hidden';
+            profileCard.classList.add('hidden');
+            lockBox.classList.add('hidden');
+            spinner.classList.remove('hidden');
+
+            try {
+                const res = await fetch('/api/members/' + encodeURIComponent(memberId));
+                const data = await res.json();
+                spinner.classList.add('hidden');
+
+                if (res.status === 404 || !data.success) {
+                    // Business outcome: Member Not Found
+                    alertBox.className = 'alert alert-warning';
+                    alertBox.innerText = data.message || 'Member not found in active ledger';
+                    return;
+                }
+
+                if (data.data.security_lock) {
+                    // Security hold - requires human escalation
+                    lockBox.classList.remove('hidden');
+                    return;
+                }
+
+                // Render Member Profile
+                document.getElementById('display-member-id').innerText = data.data.id;
+                document.getElementById('display-member-status').innerText = data.data.status;
+                document.getElementById('display-member-ssn').innerText = data.data.ssn_masked;
+
+                const tbody = document.getElementById('ledger-table-body');
+                tbody.innerHTML = '';
+                data.data.accounts.forEach(acc => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td><strong>${acc.account_number}</strong></td>
+                        <td class="account-type-cell">${acc.type}</td>
+                        <td class="account-balance-cell" style="font-weight:bold; color:#0b3c61;">${acc.balance}</td>
+                        <td>${acc.available}</td>
+                        <td><span style="color:#15803d; font-weight:600;">${acc.status}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                profileCard.classList.remove('hidden');
+
+            } catch (err) {
+                spinner.classList.add('hidden');
+                alertBox.className = 'alert alert-danger';
+                alertBox.innerText = 'Network error communicating with core banking host.';
+            }
+        }
+
+        async function unlockSupervisoryHold() {
+            const token = document.getElementById('supervisor-token-input').value.trim();
+            const msg = document.getElementById('unlock-msg');
+            if (token === '9876') {
+                msg.style.color = '#15803d';
+                msg.innerText = '✓ Token validated. Supervisory hold released.';
+                setTimeout(() => {
+                    document.getElementById('security-challenge-box').classList.add('hidden');
+                    const memberId = document.getElementById('member-id-input').value.trim();
+                    // Load records
+                    fetch('/api/members/' + encodeURIComponent(memberId) + '?force_unlock=true')
+                        .then(r => r.json())
+                        .then(d => {
+                            if (d.success) {
+                                document.getElementById('display-member-id').innerText = d.data.id;
+                                document.getElementById('display-member-status').innerText = 'ACTIVE (OVERRIDDEN)';
+                                document.getElementById('display-member-ssn').innerText = d.data.ssn_masked;
+                                const tbody = document.getElementById('ledger-table-body');
+                                tbody.innerHTML = '';
+                                d.data.accounts.forEach(acc => {
+                                    const tr = document.createElement('tr');
+                                    tr.innerHTML = `
+                                        <td><strong>${acc.account_number}</strong></td>
+                                        <td class="account-type-cell">${acc.type}</td>
+                                        <td class="account-balance-cell" style="font-weight:bold; color:#0b3c61;">${acc.balance}</td>
+                                        <td>${acc.available}</td>
+                                        <td><span style="color:#15803d; font-weight:600;">UNFROZEN</span></td>
+                                    `;
+                                    tbody.appendChild(tr);
+                                });
+                                document.getElementById('member-profile-card').classList.remove('hidden');
+                            }
+                        });
+                }, 500);
+            } else {
+                msg.style.color = '#dc2626';
+                msg.innerText = 'Invalid token. Verification failed.';
+            }
+        }
+
+        async function openSubAccount() {
+            const memberId = document.getElementById('open-member-id').value.trim();
+            const productType = document.getElementById('account-product-type').value;
+            const initialDeposit = document.getElementById('initial-deposit-amount').value;
+
+            const res = await fetch('/api/accounts/open', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    member_id: memberId,
+                    product_type: productType,
+                    initial_deposit: initialDeposit
+                })
+            });
+
+            const data = await res.json();
+            const resBox = document.getElementById('account-creation-result');
+            if (data.success) {
+                document.getElementById('created-account-number').innerText = data.data.account_number;
+                document.getElementById('created-account-type').innerText = data.data.type;
+                document.getElementById('created-account-balance').innerText = '$' + Number(initialDeposit).toFixed(2);
+                resBox.classList.remove('hidden');
+            } else {
+                alert('Error creating account: ' + data.message);
+            }
+        }
+    </script>
+</body>
+</html>

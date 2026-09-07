@@ -1,0 +1,55 @@
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environments
+.env
+.venv
+venv/
+ENV/
+env/
+
+# Testing, Coverage & Cache
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+*.log
+
+# Playwright & Browsers
+.playwright/
+test-results/
+playwright-report/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Agent maker artifacts
+agents-maker/
+.agent/
+.claude/
+.cursor/

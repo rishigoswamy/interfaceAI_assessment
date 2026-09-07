@@ -1,0 +1,248 @@
+{
+  "metadata": {
+    "id": "cap_member_lookup_v1",
+    "name": "Member Profile and Balance Lookup",
+    "version": "1.0.0",
+    "app_name": "OmniCore Banking",
+    "tenant_id": "default",
+    "description": "Searches member by ID, inspects account ledger, and retrieves current savings balance.",
+    "author": "computer-use-agent",
+    "created_at": "2026-09-01T15:23:41.987279+00:00",
+    "risk_level": "SAFE_READ",
+    "tags": [
+      "member-services",
+      "balance-inquiry",
+      "ledger-read"
+    ]
+  },
+  "entry_point_url": "http://127.0.0.1:8000",
+  "inputs": [
+    {
+      "name": "member_id",
+      "type": "string",
+      "description": "Unique identifier of the credit union member (e.g. MBR-1092).",
+      "required": true,
+      "default": "MBR-1092",
+      "allowed_values": null,
+      "validation_regex": "^MBR-[0-9A-Za-z_-]+$",
+      "sensitive": false
+    }
+  ],
+  "outputs": [
+    {
+      "name": "member_id",
+      "type": "string",
+      "description": "Verified member ID from active profile.",
+      "extractor_strategy": "CSS",
+      "selector": "#display-member-id",
+      "attribute": null,
+      "regex_pattern": null,
+      "frame_selector": null
+    },
+    {
+      "name": "member_status",
+      "type": "string",
+      "description": "Current status of the member record.",
+      "extractor_strategy": "CSS",
+      "selector": "#display-member-status",
+      "attribute": null,
+      "regex_pattern": null,
+      "frame_selector": null
+    },
+    {
+      "name": "savings_balance",
+      "type": "string",
+      "description": "Current balance of the Primary High-Yield Savings Account.",
+      "extractor_strategy": "CSS",
+      "selector": "#account-ledger-table tbody tr:last-child .account-balance-cell",
+      "attribute": null,
+      "regex_pattern": null,
+      "frame_selector": null
+    }
+  ],
+  "steps": [
+    {
+      "step_id": "step_1_nav_lookup_tab",
+      "name": "Switch to Member Inquiry Tab",
+      "action_type": "CLICK",
+      "locators": [
+        {
+          "strategy": "ROLE_NAME",
+          "value": "Member Inquiry & Ledger",
+          "description": null,
+          "role": "tab",
+          "name": "Member Inquiry & Ledger",
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "TEXT_ANCHOR",
+          "value": "Member Inquiry & Ledger",
+          "description": null,
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "CSS",
+          "value": "#tab-member-lookup",
+          "description": null,
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        }
+      ],
+      "value_template": null,
+      "checkpoint": {
+        "assertion": "ELEMENT_VISIBLE",
+        "target": "#section-lookup",
+        "expected_value": null,
+        "timeout_ms": 5000,
+        "description": "Inquiry panel must become visible"
+      },
+      "business_outcomes": [],
+      "recovery_rules": [],
+      "requires_confirmation": false,
+      "timeout_ms": 8000,
+      "optional": false
+    },
+    {
+      "step_id": "step_2_enter_member_id",
+      "name": "Enter Member ID into Search Field",
+      "action_type": "TYPE",
+      "locators": [
+        {
+          "strategy": "CSS",
+          "value": "#member-id-input",
+          "description": "Direct ID selector",
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "XPATH",
+          "value": "//input[@name='memberQuery']",
+          "description": "Semantic name fallback",
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "COORDINATES",
+          "value": "coordinates_fallback",
+          "description": null,
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": {
+            "x": 300,
+            "y": 210
+          },
+          "is_fuzzy": false
+        }
+      ],
+      "value_template": "{{inputs.member_id}}",
+      "checkpoint": null,
+      "business_outcomes": [],
+      "recovery_rules": [],
+      "requires_confirmation": false,
+      "timeout_ms": 8000,
+      "optional": false
+    },
+    {
+      "step_id": "step_3_click_search",
+      "name": "Execute Member Search",
+      "action_type": "CLICK",
+      "locators": [
+        {
+          "strategy": "ROLE_NAME",
+          "value": "Search Records",
+          "description": null,
+          "role": "button",
+          "name": "Search Records",
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "TEXT_ANCHOR",
+          "value": "Search Records",
+          "description": null,
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "CSS",
+          "value": "#btn-search-member",
+          "description": null,
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        },
+        {
+          "strategy": "XPATH",
+          "value": "//button[@type='submit']",
+          "description": null,
+          "role": null,
+          "name": null,
+          "frame_selector": null,
+          "coordinates": null,
+          "is_fuzzy": false
+        }
+      ],
+      "value_template": null,
+      "checkpoint": {
+        "assertion": "ELEMENT_VISIBLE",
+        "target": "#member-profile-card, #search-status-alert, #security-challenge-box",
+        "expected_value": null,
+        "timeout_ms": 5000,
+        "description": "Result card or status banner must appear"
+      },
+      "business_outcomes": [
+        {
+          "outcome_code": "MEMBER_NOT_FOUND",
+          "description": "The requested member record was not found in the active core banking ledger.",
+          "condition_type": "TEXT_PRESENT",
+          "target": "#search-status-alert",
+          "expected_text": "not found in active ledger",
+          "output_payload": {
+            "found": false
+          }
+        }
+      ],
+      "recovery_rules": [],
+      "requires_confirmation": false,
+      "timeout_ms": 8000,
+      "optional": false
+    }
+  ],
+  "global_recovery_rules": [
+    {
+      "trigger_selector": "#compliance-modal",
+      "trigger_text": "Daily Security & Policy Notice",
+      "resolution_action": "CLICK",
+      "resolution_target": "#btn-acknowledge-notice",
+      "max_retries": 2,
+      "description": "Auto-dismiss daily compliance notice interstitial"
+    }
+  ],
+  "allowed_domains": [
+    "localhost",
+    "127.0.0.1",
+    "0.0.0.0"
+  ]
+}
